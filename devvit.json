@@ -1,0 +1,37 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "wrong-answers-only",
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "inline": true,
+        "entry": "splash.html"
+      },
+      "game": {
+        "entry": "game.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "wrongAnswersOnly.cjs"
+  },
+  "media": {
+    "dir": "assets"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Wrong Answers Only Game",
+        "description": "Create a new Wrong Answers Only trivia game",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/create-game"
+      }
+    ]
+  },
+  "triggers": {
+    "onAppInstall": "/internal/menu/create-game"
+  }
+}
