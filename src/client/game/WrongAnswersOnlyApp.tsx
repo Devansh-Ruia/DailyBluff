@@ -41,11 +41,11 @@ export const WrongAnswersOnlyApp: React.FC = () => {
 
   // Send message to Devvit backend
   const sendMessage = async (type: string, data?: any) => {
+    // Use Devvit's webview messaging system
     if (window.parent !== window) {
       window.parent.postMessage({
         type,
-        data,
-        webviewId: 'game'
+        data
       }, '*');
     }
   };
