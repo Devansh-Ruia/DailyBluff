@@ -7,7 +7,7 @@ export default defineConfig({
   },
   logLevel: 'warn',
   build: {
-    ssr: 'index.ts',
+    ssr: 'wrongAnswersOnly.ts',
     outDir: '../../dist/server',
     emptyOutDir: true,
     target: 'node22',

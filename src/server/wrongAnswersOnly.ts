@@ -227,11 +227,11 @@ router.post('/internal/menu/create-game', async (_req, res) => {
     const post = await reddit.submitPost({
       title: '🎯 Wrong Answers Only - Daily Trivia Challenge',
       subredditName: context.subredditName,
-      kind: 'image',
-      imageUrls: ['https://reddit.com']  // This will be replaced with the web view URL
+      kind: 'self',
+      text: 'Welcome to Wrong Answers Only! A daily trivia game where the goal is to submit the most creative *wrong* answers.\n\n📅 **Daily Schedule:**\n• **12 hours:** Submit your creative wrong answers\n• **12 hours:** Vote for your favorite wrong answers\n• **Winner announced:** The most creative wrong answer wins!\n\n🏆 **Prizes:**\n• Daily winner glory\n• Streak bonuses for consecutive days\n• Leaderboard recognition\n\nThink you have what it takes to be creatively wrong? Play now!'
     });
 
-    await GameService.initializeGame(redis, post.id);
+    console.log('Post created successfully:', post.id);
 
     res.json({
       navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${post.id}`

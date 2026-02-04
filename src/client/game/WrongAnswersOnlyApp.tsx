@@ -3,25 +3,96 @@ import { QuestionDisplay } from '../components/QuestionDisplay';
 import { AnswerSubmission } from '../components/AnswerSubmission';
 import { AnswerList } from '../components/AnswerList';
 import { Leaderboard } from '../components/Leaderboard';
-import { useGameState } from '../hooks/useGameState';
 import { LeaderboardEntry } from '../../shared/types/game';
 
-export const WrongAnswersOnlyApp: React.FC = () => {
-  const { 
-    gameState, 
-    username, 
-    loading, 
-    error, 
-    submitAnswer, 
-    vote, 
-    getLeaderboard, 
-    getPlayerStats 
-  } = useGameState();
+interface GameState {
+  currentQuestion: {
+    id: string;
+    text: string;
+    category: string;
+    correctAnswer: string;
+    date: string;
+  };
+  phase: 'submission' | 'voting' | 'results';
+  phaseEndsAt: number;
+  submissions: Array<{
+    id: string;
+    odId: string;
+    odname: string;
+    answer: string;
+    timestamp: number;
+    votes: number;
+    voterIds: string[];
+  }>;
+}
 
+export const WrongAnswersOnlyApp: React.FC = () => {
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [username, setUsername] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentPlayerStats, setCurrentPlayerStats] = useState<any>(null);
   const [userVotes, setUserVotes] = useState<string[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  // Get postId from URL
+  const postId = new URLSearchParams(window.location.search).get('postId') || '';
+
+  // Send message to Devvit backend
+  const sendMessage = async (type: string, data?: any) => {
+    if (window.parent !== window) {
+      window.parent.postMessage({
+        type,
+        data,
+        webviewId: 'game'
+      }, '*');
+    }
+  };
+
+  // Listen for messages from Devvit backend
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const { type, data, error: messageError } = event.data;
+      
+      switch (type) {
+        case 'GAME_STATE':
+          setGameState(data);
+          setUsername(data.username || 'anonymous');
+          setLoading(false);
+          break;
+        case 'SUBMIT_SUCCESS':
+          // Refresh game state after successful submission
+          sendMessage('GET_GAME_STATE');
+          break;
+        case 'VOTE_SUCCESS':
+          // Refresh game state after successful vote
+          sendMessage('GET_GAME_STATE');
+          break;
+        case 'LEADERBOARD':
+          setLeaderboard(data || []);
+          break;
+        case 'PLAYER_STATS':
+          setCurrentPlayerStats(data);
+          break;
+        case 'ERROR':
+          setError(messageError || 'An error occurred');
+          setLoading(false);
+          break;
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    // Request initial game state
+    sendMessage('GET_GAME_STATE');
+    sendMessage('GET_LEADERBOARD');
+    sendMessage('GET_PLAYER_STATS');
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [postId]);
 
   useEffect(() => {
     if (gameState) {
@@ -32,35 +103,20 @@ export const WrongAnswersOnlyApp: React.FC = () => {
     }
   }, [gameState, username]);
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      const data = await getLeaderboard();
-      setLeaderboard(data);
-    };
-    
-    const fetchPlayerStats = async () => {
-      const stats = await getPlayerStats();
-      setCurrentPlayerStats(stats);
-    };
-
-    fetchLeaderboard();
-    fetchPlayerStats();
-  }, [getLeaderboard, getPlayerStats]);
-
-  const handleVote = async (submissionId: string) => {
-    const success = await vote(submissionId);
-    if (success) {
-      setUserVotes(prev => [...prev, submissionId]);
-    }
-    return success;
+  const handleVote = async (submissionId: string): Promise<boolean> => {
+    sendMessage('VOTE', { submissionId });
+    return true;
   };
 
   const handleRefresh = async () => {
-    const leaderboardData = await getLeaderboard();
-    setLeaderboard(leaderboardData);
-    
-    const stats = await getPlayerStats();
-    setCurrentPlayerStats(stats);
+    sendMessage('GET_GAME_STATE');
+    sendMessage('GET_LEADERBOARD');
+    sendMessage('GET_PLAYER_STATS');
+  };
+
+  const handleSubmitAnswer = async (answer: string) => {
+    sendMessage('SUBMIT_ANSWER', { answer });
+    return true; // Return true for compatibility
   };
 
   if (loading) {
@@ -161,7 +217,7 @@ export const WrongAnswersOnlyApp: React.FC = () => {
               <AnswerSubmission 
                 gameState={gameState}
                 username={username}
-                onSubmit={submitAnswer}
+                onSubmit={handleSubmitAnswer}
               />
             )}
             
