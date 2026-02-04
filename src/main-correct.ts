@@ -1,4 +1,4 @@
-import { Devvit } from '@devvit/public-api';
+import { Devvit, useWebView } from '@devvit/public-api';
 
 Devvit.configure({
   redditAPI: true,
@@ -9,12 +9,11 @@ Devvit.addCustomPostType({
   name: 'Wrong Answers Only',
   height: 'tall',
   render: (context) => {
-    // Set up message handler for webview communication
-    context.useWebView({
+    const webView = useWebView({
       id: 'game-webview',
       url: 'game.html',
       onMessage: async (msg) => {
-        const { type, data } = msg as any;
+        const { type, data } = msg;
         const { postId, redis, reddit } = context;
 
         try {
@@ -166,14 +165,11 @@ Devvit.addCustomPostType({
       }
     });
 
-    // Return webview element
-    return {
-      type: 'webview',
-      id: 'game-webview',
-      url: 'game.html',
-      height: '100%',
-      width: '100%'
-    };
+    return (
+      <vstack height="100%" width="100%">
+        {webView}
+      </vstack>
+    );
   },
 });
 
@@ -186,7 +182,14 @@ Devvit.addMenuItem({
         title: '🎯 Wrong Answers Only - Daily Trivia Challenge',
         subredditName: context.subredditName,
         kind: 'custom',
-        customPostType: 'Wrong Answers Only'
+        customPostType: 'Wrong Answers Only',
+        preview: (
+          <vstack gap="small" padding="medium">
+            <text size="large" weight="bold">🎯 Wrong Answers Only</text>
+            <text>A daily trivia game where creativity wins!</text>
+            <text size="small" color="neutral">Loading game...</text>
+          </vstack>
+        )
       });
 
       await initializeGame(context.redis, post.id);
@@ -229,6 +232,36 @@ async function initializeGame(redis: any, postId: string) {
       text: "How many planets are in our solar system?",
       category: "Science",
       correctAnswer: "8"
+    },
+    {
+      id: "q006",
+      text: "Who wrote Romeo and Juliet?",
+      category: "Literature",
+      correctAnswer: "William Shakespeare"
+    },
+    {
+      id: "q007",
+      text: "What is the largest ocean on Earth?",
+      category: "Geography",
+      correctAnswer: "Pacific Ocean"
+    },
+    {
+      id: "q008",
+      text: "In which year did World War II end?",
+      category: "History",
+      correctAnswer: "1945"
+    },
+    {
+      id: "q009",
+      text: "What is the speed of light?",
+      category: "Science",
+      correctAnswer: "299,792,458 meters per second"
+    },
+    {
+      id: "q010",
+      text: "Who composed the Four Seasons?",
+      category: "Music",
+      correctAnswer: "Antonio Vivaldi"
     }
   ];
 
