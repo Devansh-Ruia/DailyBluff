@@ -166,14 +166,13 @@ Devvit.addCustomPostType({
       }
     });
 
-    // Return webview using the working object syntax
+    // Return webview element
     return {
-      webview: {
-        id: 'game-webview',
-        url: 'game.html',
-        height: '100%',
-        width: '100%'
-      }
+      type: 'webview',
+      id: 'game-webview',
+      url: 'game.html',
+      height: '100%',
+      width: '100%'
     };
   },
 });
@@ -185,17 +184,16 @@ Devvit.addMenuItem({
     try {
       const post = await context.reddit.submitPost({
         title: '🎯 Wrong Answers Only - Daily Trivia Challenge',
-        subredditName: context.subredditName ?? '',
-        preview: {
-          text: 'Loading game...'
-        }
+        subredditName: context.subredditName,
+        kind: 'custom',
+        customPostType: 'Wrong Answers Only'
       });
 
       await initializeGame(context.redis, post.id);
       context.ui.showToast('Wrong Answers Only game created successfully!');
     } catch (error) {
       console.error('Error creating game post:', error);
-      context.ui.showToast(`Failed: ${error}`);
+      context.ui.showToast('Failed to create game post');
     }
   },
 });
@@ -231,36 +229,6 @@ async function initializeGame(redis: any, postId: string) {
       text: "How many planets are in our solar system?",
       category: "Science",
       correctAnswer: "8"
-    },
-    {
-      id: "q006",
-      text: "Who wrote Romeo and Juliet?",
-      category: "Literature",
-      correctAnswer: "William Shakespeare"
-    },
-    {
-      id: "q007",
-      text: "What is the largest ocean on Earth?",
-      category: "Geography",
-      correctAnswer: "Pacific Ocean"
-    },
-    {
-      id: "q008",
-      text: "In which year did World War II end?",
-      category: "History",
-      correctAnswer: "1945"
-    },
-    {
-      id: "q009",
-      text: "What is the speed of light?",
-      category: "Science",
-      correctAnswer: "299,792,458 meters per second"
-    },
-    {
-      id: "q010",
-      text: "Who composed the Four Seasons?",
-      category: "Music",
-      correctAnswer: "Antonio Vivaldi"
     }
   ];
 

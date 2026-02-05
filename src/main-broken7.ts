@@ -1,5 +1,7 @@
 import { Devvit } from '@devvit/public-api';
 
+/** @jsxImportSource @devvit/public-api */
+
 Devvit.configure({
   redditAPI: true,
   redis: true,
@@ -166,15 +168,12 @@ Devvit.addCustomPostType({
       }
     });
 
-    // Return webview using the working object syntax
-    return {
-      webview: {
-        id: 'game-webview',
-        url: 'game.html',
-        height: '100%',
-        width: '100%'
-      }
-    };
+    // Return JSX webview element
+    return (
+      <vstack height="100%" width="100%">
+        <webview id="game-webview" url="game.html" height="100%" width="100%" />
+      </vstack>
+    );
   },
 });
 
@@ -186,9 +185,11 @@ Devvit.addMenuItem({
       const post = await context.reddit.submitPost({
         title: '🎯 Wrong Answers Only - Daily Trivia Challenge',
         subredditName: context.subredditName ?? '',
-        preview: {
-          text: 'Loading game...'
-        }
+        preview: (
+          <vstack padding="medium" alignment="center middle">
+            <text size="large">Loading game...</text>
+          </vstack>
+        ),
       });
 
       await initializeGame(context.redis, post.id);
