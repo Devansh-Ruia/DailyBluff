@@ -1,6 +1,9 @@
 name: daily-bluff
 version: 0.0.2
-main: src/main.ts
+main: src/server/index.ts
+server:
+  dir: dist/server
+  entry: index.cjs
 posts:
   - type: custom
     name: Wrong Answers Only

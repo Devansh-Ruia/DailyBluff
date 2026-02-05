@@ -41,57 +41,45 @@ export const WrongAnswersOnlyApp: React.FC = () => {
 
   // Send message to Devvit backend
   const sendMessage = async (type: string, data?: any) => {
-    // Use Devvit's webview messaging system
-    if (window.parent !== window) {
-      window.parent.postMessage({
-        type,
-        data
-      }, '*');
+    try {
+      const endpoint = type.toLowerCase().replace('_', '-');
+      const options: RequestInit = {
+        method: type.startsWith('GET_') ? 'GET' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      };
+      
+      if (!type.startsWith('GET_') && data) {
+        options.body = JSON.stringify(data);
+      }
+      
+      const response = await fetch(`/api/${endpoint}`, options);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
     }
   };
 
   // Listen for messages from Devvit backend
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const { type, data, error: messageError } = event.data;
-      
-      switch (type) {
-        case 'GAME_STATE':
-          setGameState(data);
-          setUsername(data.username || 'anonymous');
-          setLoading(false);
-          break;
-        case 'SUBMIT_SUCCESS':
-          // Refresh game state after successful submission
-          sendMessage('GET_GAME_STATE');
-          break;
-        case 'VOTE_SUCCESS':
-          // Refresh game state after successful vote
-          sendMessage('GET_GAME_STATE');
-          break;
-        case 'LEADERBOARD':
-          setLeaderboard(data || []);
-          break;
-        case 'PLAYER_STATS':
-          setCurrentPlayerStats(data);
-          break;
-        case 'ERROR':
-          setError(messageError || 'An error occurred');
-          setLoading(false);
-          break;
+    // Load initial game state
+    const loadGameState = async () => {
+      try {
+        const data = await sendMessage('GET_GAME');
+        setGameState(data);
+      } catch (error) {
+        console.error('Failed to load game state:', error);
       }
     };
-
-    window.addEventListener('message', handleMessage);
     
-    // Request initial game state
-    sendMessage('GET_GAME_STATE');
-    sendMessage('GET_LEADERBOARD');
-    sendMessage('GET_PLAYER_STATS');
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
+    loadGameState();
   }, [postId]);
 
   useEffect(() => {
@@ -104,8 +92,16 @@ export const WrongAnswersOnlyApp: React.FC = () => {
   }, [gameState, username]);
 
   const handleVote = async (submissionId: string): Promise<boolean> => {
-    sendMessage('VOTE', { submissionId });
-    return true;
+    try {
+      await sendMessage('VOTE', { submissionId });
+      // Refresh game state to show updated votes
+      const data = await sendMessage('GET_GAME');
+      setGameState(data);
+      return true;
+    } catch (error) {
+      console.error('Vote error:', error);
+      return false;
+    }
   };
 
   const handleRefresh = async () => {
@@ -115,8 +111,14 @@ export const WrongAnswersOnlyApp: React.FC = () => {
   };
 
   const handleSubmitAnswer = async (answer: string) => {
-    sendMessage('SUBMIT_ANSWER', { answer });
-    return true; // Return true for compatibility
+    try {
+      await sendMessage('SUBMIT', { answer });
+      // Refresh game state to show the new submission
+      const data = await sendMessage('GET_GAME');
+      setGameState(data);
+    } catch (error) {
+      console.error('Submit error:', error);
+    }
   };
 
   if (loading) {
