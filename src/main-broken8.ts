@@ -1,5 +1,7 @@
 import { Devvit } from '@devvit/public-api';
 
+/** @jsxImportSource @devvit/public-api */
+
 Devvit.configure({
   redditAPI: true,
   redis: true,
@@ -166,10 +168,12 @@ Devvit.addCustomPostType({
       }
     });
 
-    // Return simple text for now to avoid JSX issues
-    return {
-      text: '🎯 Wrong Answers Only - Loading game...'
-    };
+    // Return webview using blocks root element
+    return (
+      <blocks height="tall">
+        <webview id="game-webview" url="game.html" />
+      </blocks>
+    );
   },
 });
 
@@ -181,9 +185,13 @@ Devvit.addMenuItem({
       const post = await context.reddit.submitPost({
         title: '🎯 Wrong Answers Only - Daily Trivia Challenge',
         subredditName: context.subredditName ?? '',
-        preview: {
-          text: 'Loading game...'
-        }
+        preview: (
+          <blocks>
+            <vstack padding="medium" alignment="center middle">
+              <text size="large">Loading game...</text>
+            </vstack>
+          </blocks>
+        ),
       });
 
       await initializeGame(context.redis, post.id);
@@ -226,6 +234,36 @@ async function initializeGame(redis: any, postId: string) {
       text: "How many planets are in our solar system?",
       category: "Science",
       correctAnswer: "8"
+    },
+    {
+      id: "q006",
+      text: "Who wrote Romeo and Juliet?",
+      category: "Literature",
+      correctAnswer: "William Shakespeare"
+    },
+    {
+      id: "q007",
+      text: "What is the largest ocean on Earth?",
+      category: "Geography",
+      correctAnswer: "Pacific Ocean"
+    },
+    {
+      id: "q008",
+      text: "In which year did World War II end?",
+      category: "History",
+      correctAnswer: "1945"
+    },
+    {
+      id: "q009",
+      text: "What is the speed of light?",
+      category: "Science",
+      correctAnswer: "299,792,458 meters per second"
+    },
+    {
+      id: "q010",
+      text: "Who composed the Four Seasons?",
+      category: "Music",
+      correctAnswer: "Antonio Vivaldi"
     }
   ];
 
