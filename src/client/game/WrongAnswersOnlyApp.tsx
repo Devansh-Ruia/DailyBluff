@@ -36,52 +36,91 @@ export const WrongAnswersOnlyApp: React.FC = () => {
   const [userVotes, setUserVotes] = useState<string[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Get postId from URL
-  const postId = new URLSearchParams(window.location.search).get('postId') || '';
-
-  // Send message to Devvit backend
-  const sendMessage = async (type: string, data?: any) => {
+  // Fetch game state from Express API
+  const fetchGameState = async () => {
     try {
-      const endpoint = type.toLowerCase().replace('_', '-');
-      const options: RequestInit = {
-        method: type.startsWith('GET_') ? 'GET' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      };
-      
-      if (!type.startsWith('GET_') && data) {
-        options.body = JSON.stringify(data);
-      }
-      
-      const response = await fetch(`/api/${endpoint}`, options);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('API Error:', error);
-      throw error;
+      const response = await fetch('/api/game');
+      if (!response.ok) throw new Error('Failed to fetch game state');
+      const data = await response.json();
+      setGameState(data);
+      setUsername(data.username || 'anonymous');
+      setLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      setLoading(false);
     }
   };
 
-  // Listen for messages from Devvit backend
-  useEffect(() => {
-    // Load initial game state
-    const loadGameState = async () => {
-      try {
-        const data = await sendMessage('GET_GAME');
-        setGameState(data);
-      } catch (error) {
-        console.error('Failed to load game state:', error);
+  // Submit an answer
+  const handleSubmitAnswer = async (answer: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to submit');
       }
-    };
-    
-    loadGameState();
-  }, [postId]);
+      await fetchGameState(); // Refresh state
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Submit failed');
+      return false;
+    }
+  };
 
+  // Vote for an answer
+  const handleVote = async (submissionId: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to vote');
+      }
+      await fetchGameState(); // Refresh state
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Vote failed');
+      return false;
+    }
+  };
+
+  // Fetch leaderboard
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch('/api/leaderboard');
+      if (!response.ok) throw new Error('Failed to fetch leaderboard');
+      const data = await response.json();
+      setLeaderboard(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard');
+    }
+  };
+
+  // Fetch player stats
+  const fetchPlayerStats = async () => {
+    try {
+      const response = await fetch('/api/player-stats');
+      if (!response.ok) throw new Error('Failed to fetch player stats');
+      const data = await response.json();
+      setCurrentPlayerStats(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch player stats');
+    }
+  };
+
+  // Load game on mount
+  useEffect(() => {
+    fetchGameState();
+  }, []);
+
+  // Update user votes when game state changes
   useEffect(() => {
     if (gameState) {
       const votes = gameState.submissions
@@ -91,34 +130,11 @@ export const WrongAnswersOnlyApp: React.FC = () => {
     }
   }, [gameState, username]);
 
-  const handleVote = async (submissionId: string): Promise<boolean> => {
-    try {
-      await sendMessage('VOTE', { submissionId });
-      // Refresh game state to show updated votes
-      const data = await sendMessage('GET_GAME');
-      setGameState(data);
-      return true;
-    } catch (error) {
-      console.error('Vote error:', error);
-      return false;
-    }
-  };
-
+  // Refresh all data
   const handleRefresh = async () => {
-    sendMessage('GET_GAME_STATE');
-    sendMessage('GET_LEADERBOARD');
-    sendMessage('GET_PLAYER_STATS');
-  };
-
-  const handleSubmitAnswer = async (answer: string) => {
-    try {
-      await sendMessage('SUBMIT', { answer });
-      // Refresh game state to show the new submission
-      const data = await sendMessage('GET_GAME');
-      setGameState(data);
-    } catch (error) {
-      console.error('Submit error:', error);
-    }
+    await fetchGameState();
+    await fetchLeaderboard();
+    await fetchPlayerStats();
   };
 
   if (loading) {
@@ -169,110 +185,71 @@ export const WrongAnswersOnlyApp: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto p-4">
-        <header className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="text-3xl">🎯</div>
-            <h1 className="text-3xl font-bold text-gray-900">Wrong Answers Only</h1>
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">🎯 Wrong Answers Only</h1>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowLeaderboard(!showLeaderboard)}
+                className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
+              >
+                {showLeaderboard ? 'Game' : 'Leaderboard'}
+              </button>
+              <button
+                onClick={handleRefresh}
+                className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
-          <p className="text-gray-600">A daily trivia game where creativity wins!</p>
-        </header>
 
-        <div className="flex justify-center gap-4 mb-6">
-          <button
-            onClick={() => setShowLeaderboard(false)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              !showLeaderboard 
-                ? 'bg-orange-500 text-white' 
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Game
-          </button>
-          <button
-            onClick={() => setShowLeaderboard(true)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              showLeaderboard 
-                ? 'bg-orange-500 text-white' 
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Leaderboard
-          </button>
-          <button
-            onClick={handleRefresh}
-            className="px-4 py-2 bg-white text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-          >
-            Refresh
-          </button>
+          {/* Game Info */}
+          {gameState && (
+            <QuestionDisplay
+              question={gameState.currentQuestion}
+              phase={gameState.phase}
+              phaseEndsAt={gameState.phaseEndsAt}
+            />
+          )}
         </div>
 
-        {showLeaderboard ? (
-          <Leaderboard 
-            leaderboard={leaderboard} 
-            currentPlayerStats={currentPlayerStats}
+        {/* Game Content */}
+        {gameState && gameState.phase === 'submission' && (
+          <AnswerSubmission
+            gameState={gameState}
+            username={username}
+            onSubmit={handleSubmitAnswer}
           />
-        ) : (
-          <div>
-            <QuestionDisplay gameState={gameState} username={username} />
-            
-            {gameState.phase === 'submission' && (
-              <AnswerSubmission 
-                gameState={gameState}
-                username={username}
-                onSubmit={handleSubmitAnswer}
-              />
-            )}
-            
-            {(gameState.phase === 'voting' || gameState.phase === 'results') && (
-              <AnswerList
-                gameState={gameState}
-                currentUsername={username}
-                onVote={handleVote}
-                userVotes={userVotes}
-              />
-            )}
-
-            {gameState.phase === 'results' && (
-              <div className="mt-6 bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Share Your Results</h3>
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-gray-600 mb-2">Copy this to share your performance:</p>
-                  <div className="bg-white border border-gray-200 rounded p-3 text-sm">
-                    🎯 Wrong Answers Only - {new Date().toLocaleDateString()}
-                    <br />
-                    Q: {gameState.currentQuestion.text}
-                    <br />
-                    My answer: "{gameState.submissions.find(s => s.odname === username)?.answer || 'Did not play'}"
-                    <br />
-                    Rank: #{gameState.submissions.sort((a, b) => b.votes - a.votes).findIndex(s => s.odname === username) + 1} of {gameState.submissions.length}
-                    <br />
-                    Play at r/WrongAnswersOnly
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    const text = `🎯 Wrong Answers Only - ${new Date().toLocaleDateString()}
-Q: ${gameState.currentQuestion.text}
-My answer: "${gameState.submissions.find(s => s.odname === username)?.answer || 'Did not play'}"
-Rank: #${gameState.submissions.sort((a, b) => b.votes - a.votes).findIndex(s => s.odname === username) + 1} of ${gameState.submissions.length}
-Play at r/WrongAnswersOnly`;
-                    navigator.clipboard.writeText(text);
-                  }}
-                  className="w-full bg-orange-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-orange-600 transition-colors"
-                >
-                  Copy to Clipboard
-                </button>
-              </div>
-            )}
-          </div>
         )}
 
-        <footer className="text-center mt-8 text-gray-500 text-sm">
-          <p>Daily trivia game for Reddit's Daily Games Hackathon</p>
-          <p className="mt-2">
-            Made with ❤️ for the Reddit community
-          </p>
-        </footer>
+        {gameState && gameState.phase === 'voting' && (
+          <AnswerList
+            gameState={gameState}
+            currentUsername={username}
+            onVote={handleVote}
+            userVotes={userVotes}
+          />
+        )}
+
+        {gameState && gameState.phase === 'results' && (
+          <AnswerList
+            gameState={gameState}
+            currentUsername={username}
+            onVote={handleVote}
+            userVotes={userVotes}
+          />
+        )}
+
+        {/* Leaderboard */}
+        {showLeaderboard && (
+          <Leaderboard
+            leaderboard={leaderboard}
+            currentPlayerStats={currentPlayerStats}
+            onRefresh={fetchLeaderboard}
+          />
+        )}
       </div>
     </div>
   );
