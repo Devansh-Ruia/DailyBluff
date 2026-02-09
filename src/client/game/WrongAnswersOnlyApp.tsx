@@ -36,72 +36,123 @@ export const WrongAnswersOnlyApp: React.FC = () => {
   const [userVotes, setUserVotes] = useState<string[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Send message to Devvit backend
-  const sendMessage = (type: string, data?: any) => {
-    if (window.parent !== window) {
-      window.parent.postMessage({
-        type,
-        data
-      }, '*');
+  // Fetch game state from Express API
+  const fetchGameState = async () => {
+    try {
+      const response = await fetch('/api/game');
+      if (!response.ok) throw new Error('Failed to fetch game state');
+      const data = await response.json();
+      setGameState(data);
+      setUsername(data.username || 'anonymous');
+      setLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      setLoading(false);
     }
   };
 
-  // Listen for messages from Devvit backend
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const msg = event.data;
-      
-      // Check if this is a Devvit message
-      if (msg.type === 'devvit-message') {
-        const { type, data, error: messageError } = msg.data.message;
-        
-        switch (type) {
-          case 'GAME_STATE':
-            setGameState(data);
-            setUsername(data.username || 'anonymous');
-            setLoading(false);
-            break;
-          case 'SUBMIT_SUCCESS':
-            if (gameState) {
-              setGameState({
-                ...gameState,
-                submissions: [...gameState.submissions, data]
-              });
-            }
-            break;
-          case 'VOTE_SUCCESS':
-            if (gameState) {
-              setGameState({
-                ...gameState,
-                submissions: gameState.submissions.map(s => 
-                  s.id === data.submissionId 
-                    ? { ...s, votes: s.votes + 1 }
-                    : s
-                )
-              });
-            }
-            break;
-          case 'LEADERBOARD':
-            setLeaderboard(data);
-            break;
-          case 'PLAYER_STATS':
-            setCurrentPlayerStats(data);
-            break;
-          case 'ERROR':
-            setError(messageError || 'Unknown error');
-            break;
-        }
+  // Submit an answer
+  const handleSubmitAnswer = async (answer: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ answer }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to submit answer');
+        return false;
       }
-    };
 
-    window.addEventListener('message', handleMessage);
-    
-    // Load initial game state
-    sendMessage('GET_GAME_STATE');
+      const result = await response.json();
+      if (gameState) {
+        setGameState({
+          ...gameState,
+          submissions: [...gameState.submissions, result.data]
+        });
+      }
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      return false;
+    }
+  };
 
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
+  // Vote for an answer
+  const handleVote = async (submissionId: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ submissionId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to vote');
+        return false;
+      }
+
+      const result = await response.json();
+      if (gameState) {
+        setGameState({
+          ...gameState,
+          submissions: gameState.submissions.map(s => 
+            s.id === result.data.submissionId 
+              ? { ...s, votes: s.votes + 1 }
+              : s
+          )
+        });
+      }
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      return false;
+    }
+  };
+
+  // Fetch leaderboard
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch('/api/leaderboard');
+      if (!response.ok) throw new Error('Failed to fetch leaderboard');
+      const data = await response.json();
+      setLeaderboard(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    }
+  };
+
+  // Fetch player stats
+  const fetchPlayerStats = async () => {
+    try {
+      const response = await fetch('/api/player-stats');
+      if (!response.ok) throw new Error('Failed to fetch player stats');
+      const data = await response.json();
+      setCurrentPlayerStats(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    }
+  };
+
+  // Refresh all data
+  const handleRefresh = () => {
+    fetchGameState();
+    fetchLeaderboard();
+    fetchPlayerStats();
+  };
+
+  // Load initial data
+  useEffect(() => {
+    fetchGameState();
+    fetchLeaderboard();
+    fetchPlayerStats();
   }, []);
 
   // Update user votes when game state changes
@@ -113,35 +164,6 @@ export const WrongAnswersOnlyApp: React.FC = () => {
       setUserVotes(votes);
     }
   }, [gameState, username]);
-
-  // Submit an answer
-  const handleSubmitAnswer = async (answer: string): Promise<boolean> => {
-    sendMessage('SUBMIT_ANSWER', { answer });
-    return true;
-  };
-
-  // Vote for an answer
-  const handleVote = async (submissionId: string): Promise<boolean> => {
-    sendMessage('VOTE', { submissionId });
-    return true;
-  };
-
-  // Fetch leaderboard
-  const fetchLeaderboard = () => {
-    sendMessage('GET_LEADERBOARD');
-  };
-
-  // Fetch player stats
-  const fetchPlayerStats = () => {
-    sendMessage('GET_PLAYER_STATS');
-  };
-
-  // Refresh all data
-  const handleRefresh = () => {
-    sendMessage('GET_GAME_STATE');
-    fetchLeaderboard();
-    fetchPlayerStats();
-  };
 
   if (loading) {
     return (
@@ -212,17 +234,15 @@ export const WrongAnswersOnlyApp: React.FC = () => {
           </div>
 
           {/* Game Info */}
-          {gameState && (
-            <QuestionDisplay
-              question={gameState.currentQuestion}
-              phase={gameState.phase}
-              phaseEndsAt={gameState.phaseEndsAt}
-            />
-          )}
+          <QuestionDisplay
+            question={gameState.currentQuestion}
+            phase={gameState.phase}
+            phaseEndsAt={gameState.phaseEndsAt}
+          />
         </div>
 
         {/* Game Content */}
-        {gameState && gameState.phase === 'submission' && (
+        {gameState.phase === 'submission' && (
           <AnswerSubmission
             gameState={gameState}
             username={username}
@@ -230,7 +250,7 @@ export const WrongAnswersOnlyApp: React.FC = () => {
           />
         )}
 
-        {gameState && gameState.phase === 'voting' && (
+        {gameState.phase === 'voting' && (
           <AnswerList
             gameState={gameState}
             currentUsername={username}
@@ -239,7 +259,7 @@ export const WrongAnswersOnlyApp: React.FC = () => {
           />
         )}
 
-        {gameState && gameState.phase === 'results' && (
+        {gameState.phase === 'results' && (
           <AnswerList
             gameState={gameState}
             currentUsername={username}
