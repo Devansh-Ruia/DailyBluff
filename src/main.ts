@@ -1,2 +1,3 @@
-// Re-export the server handler from src/server/index
-export { handler } from './server/index';
+// Re-export the server handler for Devvit
+import { handler } from './server/index';
+export default handler;
