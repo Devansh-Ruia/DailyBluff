@@ -1,15 +1,12 @@
 name: daily-bluff
 version: 0.0.2
-main: src/server/index.ts
-server:
-  dir: dist/server
-  entry: index.cjs
+main: src/main.ts
 posts:
   - type: custom
     name: Wrong Answers Only
 webviews:
   game:
-    path: src/client/game.html
+    path: webroot/game.html
 menu:
   - label: Create Wrong Answers Only Game
     location: subreddit
