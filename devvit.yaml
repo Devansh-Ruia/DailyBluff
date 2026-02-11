@@ -1,6 +1,5 @@
 name: daily-bluff
-version: 0.0.2
-main: dist/server/index.cjs
+version: 0.0.3
 posts:
   - type: custom
     name: Wrong Answers Only
