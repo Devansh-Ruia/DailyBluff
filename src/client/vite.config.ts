@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwind()],
   logLevel: 'warn',
   build: {
-    outDir: '../../dist/client',
+    outDir: '../../webroot',
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
